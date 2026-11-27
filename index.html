@@ -69,6 +69,10 @@ canvas:focus-visible{outline-offset:-4px}
 .primary{width:100%;min-height:44px;border-radius:5px;border:1px solid #dbc19572;padding:7px 9px;background:#d0ac78;color:#20180d;font-size:13px;font-weight:650;transition:background-color .25s var(--ease),transform .25s var(--ease)}
 .primary:hover{background:#e2c393}
 .primary:active{transform:translateY(1px)}
+#activities{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+#activities button{min-height:42px;margin:9px 5px 0 0;padding:8px 12px;border:1px solid #bfa2745d;border-radius:5px;background:#25251b;color:#e4dac1;cursor:pointer}
+#activities button:disabled{opacity:.45;cursor:default}
+.activity-note{color:#c3bfac;font-size:12px;line-height:1.5;margin:9px 0 0}
 .archive{margin-top:16px;border-top:1px solid var(--line);padding-top:11px}
 .archive ul{margin:5px 0 0;padding:0;list-style:none;color:var(--muted);font-size:12px}
 .footer{
@@ -92,6 +96,7 @@ canvas:focus-visible{outline-offset:-4px}
 
 
 </style>
+
 
 
 
@@ -132,6 +137,12 @@ canvas:focus-visible{outline-offset:-4px}
           <progress id="growth" max="22" value="0"></progress>
         </div>
         <div class="actions"><button class="primary" id="primary" type="button">捧暖石卵</button></div>
+        <div id="activities" hidden>
+          <p id="resources" class="save-note"></p>
+          <button id="explore" type="button">出发探险</button>
+          <button id="draw" type="button">抽取宝物 · 3 石露</button>
+          <p id="activityNote" class="activity-note" aria-live="polite"></p>
+        </div>
         <div class="archive" id="archiveBox" hidden><p class="eyebrow">旅记</p><ul id="archive"></ul></div>
       </section>
     </div>
@@ -637,7 +648,7 @@ const ShellCare = (() => {
     return values[Math.floor(next()*values.length)]+suffixes[Math.floor(next()*suffixes.length)];
   }
   const create=(seed,t=Date.now())=>({
-    v:1,seed,pet:null,satiety:0,energy:0,bond:0,trips:0,lamp:false,restUntil:0,updatedAt:t,archive:[]
+    v:1,seed,pet:null,satiety:0,energy:0,bond:0,trips:0,lamp:false,restUntil:0,updatedAt:t,archive:[],resources:0,draws:0
   });
   function finishHatch(save){
     if(save.pet)return false;
@@ -673,15 +684,14 @@ const ShellCare = (() => {
   function recommend(save){
     if(!save.pet)return "hatch";
     if(save.restUntil)return "";
-    if(canAdopt(save))return "adopt";
     if(save.satiety<68)return "feed";
     if(save.energy<58)return "rest";
-    if(save.trips<2&&save.bond>=(save.trips===0?8:14)&&canExplore(save))return "explore";
     return "play";
   }
   function nextEgg(save,seed,t){
     const next=create(seed,t);
     next.lamp=save.lamp;
+    next.resources=save.resources;next.draws=save.draws;
     next.archive=[...save.archive,{name:name(save.seed,save.pet),shape:shapeKey(save.pet)}].slice(-24);
     return next;
   }
@@ -692,8 +702,8 @@ const ShellCare = (() => {
       if(data?.v!==1||!Number.isInteger(data.seed)||data.seed<0||data.seed>0xffffffff)return null;
       const clean=create(data.seed,Number.isFinite(data.updatedAt)?Math.min(data.updatedAt,Date.now()):Date.now());
       if(data.pet)clean.pet=P.validate(data.pet,P.initial(data.seed));
-      for(const field of ["satiety","energy","bond","trips","restUntil"]){
-        if(Number.isFinite(data[field]))clean[field]=clamp(data[field],0,field==="restUntil"?Date.now()+20000:["bond","trips"].includes(field)?9999:100);
+      for(const field of ["satiety","energy","bond","trips","restUntil","resources","draws"]){
+        if(Number.isFinite(data[field]))clean[field]=clamp(data[field],0,field==="restUntil"?Date.now()+20000:["bond","trips","resources","draws"].includes(field)?9999:100);
       }
       clean.lamp=data.lamp===true;
       if(Array.isArray(data.archive))clean.archive=data.archive.filter(p=>typeof p?.name==="string"&&/^(shell|tail)-[012]$/.test(p.shape))
@@ -709,11 +719,51 @@ if(typeof module!=="undefined")module.exports=ShellCare;
 </script>
 <script>
 "use strict";
+const ShellRunner=(()=>{
+  function start(t){return {start:t,last:t,y:0,vy:0,items:[],next:0,coins:0,hits:0,finished:false};}
+  function jump(r){if(r.y===0&&!r.finished)r.vy=370;}
+  function step(r,t){
+    const dt=Math.min(.05,Math.max(0,t-r.last));r.last=t;
+    r.y=Math.max(0,r.y+r.vy*dt);r.vy-=850*dt;if(!r.y)r.vy=0;
+    if(t-r.start>r.next&&t-r.start<19){r.items.push({x:680,type:Math.random()<.48?"rock":"dew",collected:false});r.next+=1.12;}
+    for(const item of r.items){
+      item.x-=175*dt;
+      if(!item.collected&&Math.abs(item.x-140)<26){
+        if(item.type==="dew"&&r.y<105){item.collected=true;r.coins++;}
+        if(item.type==="rock"&&r.y<32){item.collected=true;r.hits++;}
+      }
+    }
+    r.items=r.items.filter(item=>item.x>-50);
+    if(t-r.start>=20||r.hits>=3)r.finished=true;
+  }
+  function draw(c,r,pet,t){
+    ShellArt.room(c,t,{trip:1});
+    c.fillStyle="#12180f99";c.fillRect(0,300,640,60);
+    for(const item of r.items){
+      if(item.collected)continue;
+      if(item.type==="rock"){
+        c.fillStyle="#82775a";c.beginPath();c.moveTo(item.x-22,281);c.lineTo(item.x-10,253);c.lineTo(item.x+13,251);c.lineTo(item.x+24,281);c.fill();
+      }else{
+        c.fillStyle="#efc77c";c.beginPath();c.arc(item.x,256,7,0,Math.PI*2);c.fill();
+      }
+    }
+    ShellArt.pet(c,140,281-r.y,pet,{t,walk:(t-r.start)*1.5,strength:1,air:0},{scale:.9});
+    c.fillStyle="#f0dfba";c.font="16px sans-serif";
+    c.fillText("石露 "+r.coins+"   碰撞 "+r.hits+"/3",18,32);
+    c.textAlign="right";c.fillText("剩余 "+Math.max(0,Math.ceil(20-(t-r.start)))+" 秒",620,32);c.textAlign="left";
+  }
+  return {start,jump,step,draw};
+})();
+
+
+</script>
+<script>
+"use strict";
 (() => {
   const A=window.ShellArt, Care=ShellCare;
   const byId=id=>document.getElementById(id);
   const world=byId("world"), c=world.getContext("2d");
-  const ui=Object.fromEntries(["primary","phase","description","windowState","floorHint","condition","growthBox","growth","growthLabel","archiveBox","archive","saveState"].map(id=>[id,byId(id)]));
+  const ui=Object.fromEntries(["primary","phase","description","windowState","floorHint","condition","growthBox","growth","growthLabel","archiveBox","archive","saveState","activities","resources","explore","draw","activityNote"].map(id=>[id,byId(id)]));
   const cradle=266, bed=113, bowl=493, edge=547;
   const labels={hatch:"捧暖石卵",feed:"喂一叶草药",play:"陪它玩",rest:"让它歇一会儿",explore:"去石隙探路",adopt:"迎接下一枚蛋"};
   const now=()=>performance.now()/1000;
@@ -761,20 +811,25 @@ if(typeof module!=="undefined")module.exports=ShellCare;
     const suggested=!home&&phase!=="egg"||busy()?"":Care.recommend(save);
     const title={
       egg:"拾到一枚石卵",molt:"壳纹亮了起来",hatch:pet?.rig==="tail"?"一条尾巴先钻了出来":"一对触须先钻了出来",
-      home:pet?Care.name(save.seed,pet):""
+      home:pet?Care.name(save.seed,pet):"",runner:"石隙探险"
     }[phase];
     const body={
       egg:"捧暖它，看看哪一只异兽会从壳里出来。",
       molt:"旧纹留了下来，壳底透出新的颜色。",
       hatch:pet?.rig==="tail"?"它用尾巴撑开半片石壳。":"它顶开了头上的整片石壳。",
-      home:view.note||(resting?"它蜷在苔床上，呼吸渐渐平稳。":"点碗喂食，点苔床休息，点异兽陪它玩。")
+      home:view.note||(resting?"它蜷在苔床上，呼吸渐渐平稳。":"点碗喂食，点苔床休息，点异兽陪它玩。"),
+      runner:"点按画面或按空格跳跃，收集石露，避开石块。"
     }[phase];
     setText(ui.phase,title);
     setText(ui.description,body);
     setText(ui.condition,home?Care.shapeNames[pet.rig][pet.shape]+Care.families[pet.rig]:"石卵");
     setText(ui.windowState,home?Care.name(save.seed,pet):phase==="egg"?"石卵":"正在孵化");
-    setText(ui.floorHint,home?"食碗 · 喂食　苔床 · 休息　异兽 · 陪玩":"点按石卵也可以开始孵化。");
+    setText(ui.floorHint,home?"食碗 · 喂食　苔床 · 休息　异兽 · 陪玩":phase==="runner"?"点按画面或按空格跳跃。":"点按石卵也可以开始孵化。");
     ui.growthBox.hidden=!home;
+    ui.activities.hidden=!home;
+    setText(ui.resources,"石露 "+save.resources+" · 宝物 "+save.draws);
+    ui.explore.disabled=busy()||resting;
+    ui.draw.disabled=busy()||resting||save.resources<3;
     ui.growth.value=save.bond;
     setText(ui.growthLabel,home?Care.growth(save):"");
     ui.primary.hidden=!suggested;
@@ -857,6 +912,19 @@ if(typeof module!=="undefined")module.exports=ShellCare;
     }
     refresh();
   }
+  ui.explore.addEventListener("click",()=>{
+    if(view.phase!=="home"||busy()||save.restUntil)return;
+    view.runner=ShellRunner.start(now());setPhase("runner");
+    setText(ui.floorHint,"点按画面或按空格跳跃，收集石露，避开石块。");
+  });
+  ui.draw.addEventListener("click",()=>{
+    if(save.resources<3||busy()||save.restUntil)return;
+    save.resources-=3;save.draws++;
+    const prizes=["苔晶","月纹石","暖光铜铃","古瓦碎片"];
+    const prize=prizes[crypto.getRandomValues(new Uint32Array(1))[0]%prizes.length];
+    setText(ui.activityNote,"抽到了"+prize+"，已收入旅囊。");
+    Care.change(save,{bond:2});persist();refresh();
+  });
   function startTrip(){
     view.note="它沿着石隙往更深处走。";
     move(edge,now(),"depart",t=>{
@@ -939,7 +1007,22 @@ if(typeof module!=="undefined")module.exports=ShellCare;
     return a;
   }
   function frame(stamp){
-    const t=stamp/1000,a=compose(t);
+    const t=stamp/1000;
+    if(view.phase==="runner"){
+      ShellRunner.step(view.runner,t);
+      ShellRunner.draw(c,view.runner,save.pet,t);
+      world.dataset.phase="runner";
+      if(view.runner.finished){
+        const found=view.runner.coins;
+        save.resources=Math.min(9999,save.resources+found);
+        save.trips++;save.lamp=true;
+        Care.change(save,{energy:-12,satiety:-8,bond:3});
+        view.note="探险归来，带回 "+found+" 枚石露。";
+        persist();setPhase("home");
+      }
+      requestAnimationFrame(frame);return;
+    }
+    const a=compose(t);
     const phase=view.phase,age=t-view.t,pet=save.pet;
     A.room(c,t,{herb:view.food,lampOn:save.lamp,lampPlaced:save.lamp,trip:["depart","away","return"].includes(view.action?.kind)?1:0});
     if(phase==="egg")A.egg(c,cradle,ShellProfiles.initial(save.seed),t);
@@ -959,6 +1042,7 @@ if(typeof module!=="undefined")module.exports=ShellCare;
   }
   ui.primary.addEventListener("click",()=>dispatch(ui.primary.dataset.command));
   world.addEventListener("pointerup",event=>{
+    if(view.phase==="runner"){ShellRunner.jump(view.runner);return;}
     const box=world.getBoundingClientRect();
     const x=(event.clientX-box.left)/box.width*A.w;
     const y=(event.clientY-box.top)/box.height*A.h;
@@ -973,6 +1057,7 @@ if(typeof module!=="undefined")module.exports=ShellCare;
     else if(y>A.ground-125)move(A.clamp(x,123,edge));
   });
   world.addEventListener("keydown",e=>{
+    if(view.phase==="runner"&&[" ","ArrowUp"].includes(e.key)){e.preventDefault();ShellRunner.jump(view.runner);return;}
     if(!["ArrowLeft","ArrowRight"].includes(e.key)||view.phase!=="home"||busy()||save.restUntil)return;
     e.preventDefault();move(A.clamp(view.x+(e.key==="ArrowLeft"?-67:67),123,edge));
   });
