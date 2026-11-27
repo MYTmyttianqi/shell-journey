@@ -75,7 +75,7 @@ function sprite(id,anim,x,y,scale=1,flip=false,time=t){
 }
 function glow(x,y,r,color){const grad=g.createRadialGradient(x,y,0,x,y,r);grad.addColorStop(0,color);grad.addColorStop(1,"transparent");g.fillStyle=grad;g.fillRect(x-r,y-r,2*r,2*r)}
 function render(now){
- const dt=Math.min(.035,Math.max(0,now/1000-t));t=now/1000;if(mode==="studio"){paintSample();requestAnimationFrame(render);return}if(mode==="portrait"){paintPortrait();requestAnimationFrame(render);return}if(mode==="arena"){arenaFrame(dt);requestAnimationFrame(render);return}if(mode==="home"||mode==="journal"){paintPortrait();requestAnimationFrame(render);return}if(mode==="roof"){roofFrame(dt);requestAnimationFrame(render);return}if(mode==="field"){fieldFrame(dt);requestAnimationFrame(render);return}const w=c.width,h=c.height,homeScene=["home","choose","journal"].includes(mode),scene=maps[homeScene?"grove":realm];
+ const dt=Math.min(.035,Math.max(0,now/1000-t));t=now/1000;if(mode==="studio"){paintSample();requestAnimationFrame(render);return}if(mode==="portrait"||mode==="armory"){paintPortrait();requestAnimationFrame(render);return}if(mode==="arena"){arenaFrame(dt);requestAnimationFrame(render);return}if(mode==="home"||mode==="journal"){paintPortrait();requestAnimationFrame(render);return}if(mode==="roof"){roofFrame(dt);requestAnimationFrame(render);return}if(mode==="field"){fieldFrame(dt);requestAnimationFrame(render);return}const w=c.width,h=c.height,homeScene=["home","choose","journal"].includes(mode),scene=maps[homeScene?"grove":realm];
  const cx=Math.round(w*.5),cy=Math.round(h*.47),age=t-motionStart,pulse=age<.55?Math.sin(Math.PI*age/.55):0;
  g.drawImage(scene,cx-scene.width/2,cy-scene.height/2);
  g.fillStyle=homeScene?"#25314f55":realm==="rift"?"#2b194d63":"#4a172444";g.fillRect(0,0,w,h);
@@ -103,6 +103,7 @@ addEventListener("DOMContentLoaded",()=>Promise.all(Object.entries(DATA.images).
 
 
 
+
 </script><script>"use strict";
 const trailKey="shell-journey.moonmine.v1";
 const trail=Object.assign({seed:crypto.getRandomValues(new Uint32Array(1))[0],edits:{},ore:0,gem:0,blocks:4,lamp:false,pick:false,visits:0,kills:0,taken:{},stats:{},ratings:[]},read(trailKey));
@@ -117,7 +118,7 @@ function journal(){
  for(const [icon,line] of [["default_book","旅人手记　·　"+pet.name+" 同行"],["default_tool_steelpick",trail.pick?"已装备星纹镐 · 采掘距离提升":"钢镐 · 点击附近地层开采"],["default_mese_crystal","辉晶 "+trail.ore+"　月石 "+trail.gem+"　木台 "+trail.blocks],["default_chest_front","远征 "+trail.visits+" 次　驱散洞灵 "+trail.kills+" 只"]]){
  const row=document.createElement("p");row.append(iconImage(icon),line);book.append(row)}
   const portrait=document.createElement("canvas");portrait.width=80;portrait.height=35;portrait.style.cssText="position:static;width:128px;height:56px;image-rendering:pixelated;float:right";
- const ink=portrait.getContext("2d");for(const [id,x] of [["clotharmor",8],[pet.blade?"bluesword":"sword1",8],[beast(),48]]){const d=DATA.sprites[id],row=d.animations.idle_down.row;ink.drawImage(img[id],0,row*d.height,d.width,d.height,x,0,d.width,d.height)}
+ const ink=portrait.getContext("2d");for(const [id,x] of [["clotharmor",8],[beast(),48]]){const d=DATA.sprites[id],row=d.animations.idle_down.row;ink.drawImage(img[id],0,row*d.height,d.width,d.height,x,0,d.width,d.height)}
  book.insertBefore(portrait,heading);
  const stance=button(trail.guard?"守护 · 切换为探矿":"探矿 · 切换为守护","default_mese_crystal",()=>{trail.guard=!trail.guard;persist();journal()});book.append(stance);
  const desc=document.createElement("small");desc.textContent=trail.guard?" 洞灵每次远征的首次攻击由灵兽抵挡。":" 灵兽照亮附近藏矿。";book.append(desc);
@@ -275,34 +276,33 @@ function roofFrame(dt){
 
 
 const paths=[
- {name:"Moonblade",weapon:"weapon_regular_sword",color:"#c7edee",summary:"弧斩近敌，翻滚冷却更短。"},
- {name:"Windstring",weapon:"weapon_bow",color:"#dfc582",summary:"双箭齐发，擅长拉开距离。"},
- {name:"Starcaller",weapon:"weapon_knife",color:"#e2aaff",summary:"星核命中后炸开，对邻近敌人造成溅射。"}
+ {name:"Moonblade",weapon:"weapon_regular_sword",color:"#c7edee",summary:"主动技「月震」击退近敌，短暂护身。"},
+ {name:"Windstring",weapon:"weapon_bow",color:"#dfc582",summary:"主动技「风羽」朝瞄准方向射出扇形箭雨。"},
+ {name:"Starcaller",weapon:"weapon_knife",color:"#e2aaff",summary:"主动技「星落」召唤陨星打击多个敌人。"}
 ];
 if(!Number.isInteger(trail.path)||!paths[trail.path]){trail.path=crypto.getRandomValues(new Uint32Array(1))[0]%paths.length;trail.vaultXP=0;persist()}
 const rank=()=>demo?([1,2,4][stageEdit]):1+Math.min(5,Math.floor((trail.vaultXP||0)/3));
 function knight(x,y,scale,angle,moving,roll=0,attacking=0){
- const look=currentLook();const id=look.skin+"_"+(moving?"run":"idle")+"_anim_f"+(Math.floor(t*(moving?10:5))%4),im=img[id],weapon=img[look.weapon];
+ const look=currentLook();const id=look.skin+"_"+(moving?"run":"idle")+"_anim_f"+(Math.floor(t*(moving?10:5))%4),im=img[id],weapon=mode==="arena"&&journey?img[journey.items[journey.weapon]]:null;
  const flip=Math.cos(angle)<0;
  g.save();g.translate(Math.round(x),Math.round(y));g.scale(scale,scale);g.translate(0,-8);g.rotate(roll);g.scale(flip?-1:1,1);
- g.drawImage(im,-Math.floor(im.width/2),8-im.height);g.translate(4,2);g.rotate((flip?Math.PI-angle:angle)+.8+attacking);g.drawImage(weapon,-2,-weapon.height*.78);g.restore()
+ g.drawImage(im,-Math.floor(im.width/2),8-im.height);g.translate(4,2);g.rotate((flip?Math.PI-angle:angle)+.8+attacking);if(weapon)g.drawImage(weapon,-2,-weapon.height*.78);g.restore()
 }
 function portrait(){mode="portrait";$("main").dataset.mode=mode;$("#enterHero").onclick=()=>home(paths[trail.path].name+" · "+paths[trail.path].summary)}
 function paintPortrait(){const w=c.width,h=c.height,cx=w/2,cy=h*.55;const sky=g.createRadialGradient(cx,cy,4,cx,cy,Math.max(w,h)*.66);sky.addColorStop(0,"#303041");sky.addColorStop(.45,"#1e202b");sky.addColorStop(1,"#0e1018");g.fillStyle=sky;g.fillRect(0,0,w,h);g.fillStyle="#11131b";g.beginPath();g.ellipse(cx,cy+1,19,4,0,0,Math.PI*2);g.fill();knight(cx,cy,Math.min(3.6,w/46),-.22,false)}
 let battle,arKeys=new Set(),leftTouch=null,rightTouch=null;
 const norm=(x,y)=>{const m=Math.hypot(x,y)||1;return [x/m,y/m]};
-function wave(n){battle.wave=n;const foe=currentLook().foe;const units=n===1?["skelet",foe,"orc_shaman"]:["orc_shaman",foe,"big_demon"];battle.enemies=units.map((type,i)=>({type,x:[.16,.83,.72][i]*c.width,y:[.29,.29,.62][i]*c.height,hp:type==="big_demon"?9:4,cd:2+i,hit:0}));}
-function enterArena(){mode="arena";$("main").dataset.mode=mode;arKeys.clear();leftTouch=null;rightTouch=null;
- battle={x:c.width*.45,y:c.height*.56,hp:6,angle:0,cd:0,dash:0,dashCD:0,inv:1,swing:0,shots:[],bolts:[],fx:[],wave:1,fire:false,aim:null,dir:[1,0],ended:0,cover:themes[currentLook().map].cover.map(([x,y])=>({x:c.width*x,y:c.height*y,hp:3}))};wave(1);
- const controls=$("#pads");controls.replaceChildren(button("Dodge",null,dodge),button("Retreat",null,()=>endBattle(false)));
- $("#place").textContent="The Lantern Vault";say("WASD 移动 · 按住画面瞄准攻击 · 空格闪避。触屏左侧拖动，右侧按住攻击。");battleHud()
+function launchChamber(){mode="arena";$("main").dataset.mode=mode;arKeys.clear();leftTouch=null;rightTouch=null;
+ battle={x:c.width*.45,y:c.height*.56,hp:6,angle:0,cd:0,dash:0,dashCD:0,inv:1,swing:0,shots:[],bolts:[],fx:[],wave:1,fire:false,aim:null,dir:[1,0],ended:0,cover:themes[currentLook().map].cover.map(([x,y])=>({x:c.width*x,y:c.height*y,hp:3}))};loadChamber(0,0,0,0);
+ const controls=$("#pads");controls.replaceChildren(button(skillNames[activePath()],null,castSkill),button("Dodge",null,dodge),button("Retreat",null,()=>endBattle(false)));
+ say("WASD 移动 · 按住画面瞄准攻击 · 空格闪避 · E 技能。触屏左侧拖动，右侧按住攻击。");battleHud()
 }
-function battleHud(){$("#status").textContent=paths[activePath()].name+"　"+battle.hp+" / 6　·　"+battle.wave+" / 2"}
+function battleHud(){$("#status").textContent="体力 "+battle.hp+"/6 · ("+journey.x+", "+journey.y+") · 已清 "+journey.clears}
 function endBattle(win){if(mode!=="arena")return;if(demo){demo=false;arKeys.clear();leftTouch=null;rightTouch=null;openStudio();return}if(win){trail.vaultXP=(trail.vaultXP||0)+3;trail.ore+=2;pet.xp++;store();persist()}arKeys.clear();leftTouch=null;rightTouch=null;home(win?"地宫已清空 · 辉晶 +2，"+paths[activePath()].name+" 成长至 Rank "+rank()+"。":"已退出地宫。")}
 function dodge(){if(mode!=="arena"||battle.dashCD>0)return;battle.dash=.2;battle.inv=.32;battle.dashCD=activePath()===0?.68:1.05;mark("dodge")}
 function burst(x,y,color){battle.fx.push({x,y,color,ttl:.2})}
 function attack(){
- const b=battle;if(b.cd>0)return;const id=activePath();const target=b.aim||b.enemies.reduce((a,v)=>!a||Math.hypot(v.x-b.x,v.y-b.y)<Math.hypot(a.x-b.x,a.y-b.y)?v:a,null);
+ const b=battle;if(b.cd>0)return;const id=journey.weapon;const target=b.aim||b.enemies.reduce((a,v)=>!a||Math.hypot(v.x-b.x,v.y-b.y)<Math.hypot(a.x-b.x,a.y-b.y)?v:a,null);
  if(target)b.angle=Math.atan2(target.y-b.y,target.x-b.x);
  const a=b.angle;b.swing=.23;b.cd=[.28,.35,.53][id]*100/currentLook().pace;mark("attack");
  if(id===0){for(const box of b.cover)if(Math.hypot(box.x-b.x,box.y-b.y)<25)box.hp--;for(const e of b.enemies){const dx=e.x-b.x,dy=e.y-b.y,dist=Math.hypot(dx,dy);if(dist<34&&(dist<12||(dx*Math.cos(a)+dy*Math.sin(a))/dist>-.12)){e.hp-=2+rank();e.hit=.16;burst(e.x,e.y,paths[id].color)}}}
@@ -315,10 +315,10 @@ c.addEventListener("pointerdown",e=>{if(mode!=="arena")return;const p=point(e);c
 c.addEventListener("pointermove",e=>{if(mode!=="arena")return;if(leftTouch?.id===e.pointerId)leftTouch.p=point(e);else if(rightTouch===e.pointerId||e.pointerType==="mouse")battle.aim=point(e)});
 function release(e){if(leftTouch?.id===e.pointerId)leftTouch=null;if(rightTouch===e.pointerId){rightTouch=null;if(battle)battle.fire=false}}
 for(const evt of ["pointerup","pointercancel","lostpointercapture"])c.addEventListener(evt,release);
-addEventListener("keydown",e=>{if(mode!=="arena")return;if(["Space","ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code))e.preventDefault();arKeys.add(e.code);if(e.code==="Space"&&!e.repeat)dodge()});
+addEventListener("keydown",e=>{if(mode!=="arena")return;if(["Space","ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.code))e.preventDefault();arKeys.add(e.code);if(e.code==="Space"&&!e.repeat)dodge();if(e.code==="KeyE"&&!e.repeat)castSkill()});
 addEventListener("keyup",e=>arKeys.delete(e.code));addEventListener("blur",()=>{arKeys.clear();leftTouch=null;rightTouch=null;if(battle)battle.fire=false});
 function arenaFrame(dt){
- const b=battle,w=c.width,h=c.height;
+ const b=battle,w=c.width,h=c.height;updateSkill(dt);
  for(const k of ["cd","dash","dashCD","inv","swing"])b[k]=Math.max(0,b[k]-dt);
  let dx=+(arKeys.has("KeyD")||arKeys.has("ArrowRight"))-+(arKeys.has("KeyA")||arKeys.has("ArrowLeft")),dy=+(arKeys.has("KeyS")||arKeys.has("ArrowDown"))-+(arKeys.has("KeyW")||arKeys.has("ArrowUp"));
  if(leftTouch){dx+=leftTouch.p.x-leftTouch.origin.x;dy+=leftTouch.p.y-leftTouch.origin.y}
@@ -331,15 +331,15 @@ function arenaFrame(dt){
  for(const s of b.shots){s.x+=s.vx*dt;s.y+=s.vy*dt;s.ttl-=dt;const cover=b.cover.find(o=>o.hp>0&&Math.hypot(o.x-s.x,o.y-s.y)<8);if(cover){cover.hp--;s.ttl=0;burst(cover.x,cover.y,"#ffe1aa");continue}const hit=b.enemies.find(e=>e.hp>0&&Math.hypot(e.x-s.x,e.y-s.y)<8);if(hit){s.ttl=0;for(const e of b.enemies)if(e===hit||(s.id===2&&Math.hypot(e.x-hit.x,e.y-hit.y)<28)){e.hp-=rank()+(s.id===2?2:0);e.hit=.14}burst(hit.x,hit.y,paths[s.id].color)}}
  for(const s of b.bolts){s.x+=s.vx*dt;s.y+=s.vy*dt;s.ttl-=dt;if(b.cover.some(o=>o.hp>0&&Math.hypot(o.x-s.x,o.y-s.y)<8)){s.ttl=0;continue}if(Math.hypot(s.x-b.x,s.y-b.y)<5){s.ttl=0;hurt()}}
  b.shots=b.shots.filter(s=>s.ttl>0);b.bolts=b.bolts.filter(s=>s.ttl>0);b.enemies=b.enemies.filter(e=>e.hp>0);
- if(b.hp<=0){endBattle(false);return}if(!b.enemies.length){if(b.wave===2){endBattle(true);return}wave(2);battleHud();say("第二间 · 留意祭司和领主的弹幕。")}
- paintArenaFloor(g,w,h,currentLook().map);
+ if(b.hp<=0){endBattle(false);return}if(!b.enemies.length&&!journey.open)clearChamber();if(journey.open&&crossDoor())return;
+ paintArenaFloor(g,w,h,journey.theme);drawDoors();
  for(const x of [12,w-18]){drawTexture("default_torch_on_floor",x,10,10,15);glow(x+5,20,30,"#f6ae6655")}
  b.cover=b.cover.filter(o=>o.hp>0);for(const o of b.cover)drawTexture("crate",o.x-8,o.y-9);for(const e of b.enemies){const im=img[e.type+"_run_anim_f"+(Math.floor(t*7)%4)];g.save();g.translate(Math.round(e.x),Math.round(e.y));g.scale(e.x>b.x?-1:1,1);g.globalAlpha=e.hit?.6:1;g.drawImage(im,-im.width/2,-im.height+5);g.restore()}
  g.save();g.globalAlpha=b.inv>0?.73:1;knight(b.x,b.y+4,1,b.angle,moving,b.dash?(1-b.dash/.2)*Math.PI*2:0,b.swing?Math.sin(b.swing/.23*Math.PI)*1.2:0);g.restore();
- if(b.aim&&b.fire){g.strokeStyle="#edd9a78a";g.lineWidth=1;g.beginPath();g.arc(b.aim.x,b.aim.y,4,0,Math.PI*2);g.stroke()}if(b.swing&&activePath()===0){g.strokeStyle="#d6fbec";g.lineWidth=2;g.beginPath();g.arc(b.x,b.y,22,b.angle-1.1,b.angle+1.1);g.stroke();g.lineWidth=1}
+ if(b.aim&&b.fire){g.strokeStyle="#edd9a78a";g.lineWidth=1;g.beginPath();g.arc(b.aim.x,b.aim.y,4,0,Math.PI*2);g.stroke()}if(b.swing&&journey.weapon===0){g.strokeStyle="#d6fbec";g.lineWidth=2;g.beginPath();g.arc(b.x,b.y,22,b.angle-1.1,b.angle+1.1);g.stroke();g.lineWidth=1}
  for(const s of b.shots){g.strokeStyle=paths[s.id].color;g.lineWidth=s.id===2?3:1;g.beginPath();g.moveTo(s.x-s.vx*.055,s.y-s.vy*.055);g.lineTo(s.x,s.y);g.stroke()}g.lineWidth=1;
  for(const s of b.bolts){g.fillStyle="#fb9774";g.beginPath();g.arc(s.x,s.y,2,0,7);g.fill()}
- for(const f of b.fx){f.ttl-=dt;sprite("sparks","idle",f.x,f.y,1,false,Math.max(0,.2-f.ttl)*3)}b.fx=b.fx.filter(f=>f.ttl>0)
+ if(journey.ring>0){g.strokeStyle=paths[activePath()].color;g.beginPath();g.arc(b.x,b.y,10+(1-journey.ring/.4)*47,0,7);g.stroke()}for(const f of b.fx){f.ttl-=dt;sprite("sparks","idle",f.x,f.y,1,false,Math.max(0,.2-f.ttl)*3)}b.fx=b.fx.filter(f=>f.ttl>0)
 }
 
 
@@ -390,6 +390,47 @@ function paintSample(){if(!sample)return;const ctx=sample.getContext("2d"),v=dra
  for(const [x,y] of themes[v.map].cover)ctx.drawImage(img.crate,Math.round(x*176)-4,Math.round(y*68)-4,9,9);
  const f=Math.floor(t*6)%4,hero=img[v.skin+"_idle_anim_f"+f],enemy=img[v.foe+"_run_anim_f"+f];ctx.drawImage(hero,43-hero.width/2,52-hero.height);ctx.drawImage(img[v.weapon],48,32,9,21);ctx.save();ctx.translate(124,51);ctx.scale(-1,1);ctx.drawImage(enemy,-enemy.width/2,-enemy.height);ctx.restore()}
 
+
+
+const skillNames=["月震","风羽","星落"];
+let journey;
+function enterArena(){
+ const items=demo?[draft[routeEdit][stageEdit].weapon]:[...new Set([liveLooks[0][0].weapon,liveLooks[1][0].weapon,liveLooks[2][0].weapon])];
+ if(demo){const allowed=[["weapon_regular_sword","weapon_lavish_sword","weapon_katana","weapon_double_axe"],["weapon_bow","weapon_bow_2"],["weapon_green_magic_staff","weapon_red_magic_staff","weapon_knife"]];const itemsAll=["weapon_regular_sword","weapon_bow","weapon_green_magic_staff"];itemsAll[routeEdit]=items[0];beginJourney(itemsAll,allowed.findIndex(a=>a.includes(items[0])));return}
+ mode="armory";$("main").dataset.mode="home";$("#log").textContent="";
+ ui("Vault entrance","","挑一件武器","长刃近战，弓射双箭，法杖溅射。成长路线决定主动技，武器由你决定。",[]);
+ const nav=$("nav");nav.replaceChildren(...items.map((v,i)=>button(arms[v],v,()=>beginJourney(items,i))),button("返回",null,()=>home()));
+}
+function beginJourney(items,weapon){
+ journey={seed:crypto.getRandomValues(new Uint32Array(1))[0],items,weapon,x:0,y:0,visited:new Set(),cleared:new Set(),clears:0,skill:0,ring:0,open:false};
+ launchChamber();battleHud()
+}
+function chamberHash(x,y,salt=0){let h=Math.imul(x^journey.seed,73856093)^Math.imul(y,19349663)^Math.imul(salt+1,83492791);h=Math.imul(h^(h>>>16),2246822507);return (h^(h>>>13))>>>0}
+const exits=[[1,0],[-1,0],[0,-1],[0,1]];
+function hasDoor(x,y,dx,dy){return dx!==0||x===0||chamberHash(x,Math.min(y,y+dy),7)%3!==0}
+function loadChamber(x,y,dx,dy){
+ const j=journey,b=battle,key=x+","+y,h=chamberHash(x,y),d=Math.abs(x)+Math.abs(y);
+ j.x=x;j.y=y;j.visited.add(key);j.open=j.cleared.has(key);j.theme=!d?currentLook().map:Object.keys(themes)[h%3];j.kind=!d?"entrance":d%5===0?"guardian":h%7===0?"spring":"hall";
+ const w=c.width,H=c.height;b.x=dx>0?20:dx<0?w-20:w*.5;b.y=dy>0?32:dy<0?H-27:H*.54;
+ b.cover=themes[j.theme].cover.map(([u,v])=>({x:(h%2?1-u:u)*w,y:v*H,hp:3}));b.shots=[];b.bolts=[];b.fx=[];b.fire=false;b.aim=null;b.inv=1;b.dash=0;
+ const units=j.kind==="entrance"?["skelet","skelet"]:j.kind==="guardian"?["big_demon","orc_shaman"]: [currentLook().foe,["skelet","imp","ogre"][h%3],...(d>2?["orc_shaman"]:[])];
+ b.enemies=j.open||j.kind==="spring"?[]:units.map((type,i)=>{const spots=[[.20,.30],[.81,.35],[.50,.74],[.78,.72]].filter(([a,v])=>Math.hypot(a*w-b.x,v*H-b.y)>22);const [a,v]=spots[(i+(h%spots.length))%spots.length];return {type,x:a*w,y:v*H,hp:(type==="big_demon"?9:3)+Math.min(7,Math.floor(d/4)),cd:2+i,hit:0}});
+ if(j.kind==="spring"&&!j.open){b.hp=Math.min(6,b.hp+2);j.open=true;j.cleared.add(key)}
+ $("#place").textContent=themes[j.theme].name+" · "+({entrance:"入口",guardian:"守卫厅",spring:"泉室",hall:"回廊"})[j.kind];say(j.open?"门已开启。走进亮门探索相邻房间。":"清除守卫，点亮出口。");battleHud()
+}
+function clearChamber(){const j=journey;j.open=true;j.cleared.add(j.x+","+j.y);j.clears++;
+ if(!demo){trail.ore+=j.kind==="guardian"?3:1;trail.vaultXP=(trail.vaultXP||0)+1;if(j.kind==="guardian")trail.gem++;persist()}
+ say("守卫已清。走入青色门洞选择下一间，也可以原路返回。");battleHud()
+}
+function crossDoor(){const b=battle,j=journey,w=c.width,h=c.height;for(const [dx,dy] of exits){if(!hasDoor(j.x,j.y,dx,dy))continue;const at=dx?(Math.abs(b.y-h*.5)<13&&(dx>0?b.x>=w-10:b.x<=10)):(Math.abs(b.x-w*.5)<13&&(dy>0?b.y>=h-16:b.y<=23));if(at){loadChamber(j.x+dx,j.y+dy,dx,dy);return true}}return false}
+function drawDoors(){const j=journey,w=c.width,h=c.height;for(const [dx,dy] of exits){if(!hasDoor(j.x,j.y,dx,dy))continue;const x=dx===1?w-4:dx===-1?4:w*.5,y=dy===1?h-7:dy===-1?12:h*.5;g.save();g.translate(x,y);if(dx)g.rotate(Math.PI/2);g.drawImage(img.wall_mid,-16,-5,32,10);g.fillStyle="#161524";g.fillRect(-10,-5,20,10);g.restore();g.fillStyle=j.open?"#81d9b4":"#985b5c";g.fillRect(Math.round(x-(dx?3:12)),Math.round(y-(dy?3:12)),dx?6:24,dy?6:24);if(j.open)glow(x,y,12,"#77ffba61")}
+ const ox=w-18,oy=25;for(let i=-2;i<=2;i++)for(let k=-2;k<=2;k++){const id=(j.x+i)+","+(j.y+k);if(!j.visited.has(id)&&Math.abs(i)+Math.abs(k)!==1)continue;if(!j.visited.has(id)&&!hasDoor(j.x,j.y,i,k))continue;g.fillStyle=!i&&!k?"#ffe0a0":j.cleared.has(id)?"#99c5b5":"#666879";g.fillRect(ox+i*4,oy+k*4,3,3)}}
+function castSkill(){if(mode!=="arena"||journey.skill>0)return;const b=battle,k=activePath();journey.skill=[4,4,6][k];journey.ring=.4;
+ if(k===0){b.inv=1;for(const e of b.enemies){const dx=e.x-b.x,dy=e.y-b.y;if(Math.hypot(dx,dy)>58)continue;const [nx,ny]=norm(dx,dy);e.hp-=4;e.x=Math.max(8,Math.min(c.width-8,e.x+nx*14));e.y=Math.max(20,Math.min(c.height-14,e.y+ny*14));burst(e.x,e.y,paths[k].color)}}
+ else if(k===1){const target=b.aim||b.enemies[0],a=target?Math.atan2(target.y-b.y,target.x-b.x):b.angle;for(let i=-3;i<=3;i++)b.shots.push({x:b.x,y:b.y,vx:Math.cos(a+i*.12)*145,vy:Math.sin(a+i*.12)*145,ttl:2,id:1})}
+ else for(const e of b.enemies.slice(0,3)){e.hp-=4;e.hit=.3;burst(e.x,e.y,paths[k].color)}
+}
+function updateSkill(dt){journey.skill=Math.max(0,journey.skill-dt);journey.ring=Math.max(0,journey.ring-dt);const btn=$("#pads button");if(btn){const txt=skillNames[activePath()]+(journey.skill>0?" "+Math.ceil(journey.skill)+"s":" · E");if(btn.textContent!==txt)btn.textContent=txt;btn.disabled=journey.skill>0}}
 
 </script></html>
 
